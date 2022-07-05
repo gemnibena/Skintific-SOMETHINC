@@ -1,0 +1,272 @@
+---
+title: "Social Media"
+author: "Gemni"
+date: '2022-06-29'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+```
+
+```{r}
+rm(list=ls())
+```
+
+```{r}
+library(dplyr)
+library(readxl)
+library(lubridate) #cleansing date
+```
+
+#ETL
+##extraction data
+```{r}
+follower <- read_xlsx("IG Follower Scraping.xlsx")
+post <- read_xlsx("IG post Scraping.xlsx")
+```
+
+##menghitung jumlah data berdasarkan kolom Name
+```{r}
+post %>% 
+  group_by(Name) %>% 
+  count(Name)
+```
+
+
+##transform data
+###filtering berdasarkan brand yang harus dipilih
+```{r}
+df_post <- post %>% 
+  group_by(Name) %>% 
+  filter(Name == "Skintific Indonesia" | Name == "SOMETHINC")
+```
+
+###menghiung jumlah data berdasarkan brand yang dipilih
+```{r}
+df_post %>% 
+  group_by(Name) %>% 
+  count()
+```
+
+## cleansing
+### menyesuaikan format tanggal +7 sesuai dengan jam jakarta
+```{r}
+df_post <- df_post %>% 
+  mutate(my_date = Date + hours(7)) %>% 
+  relocate (my_date, .after=Date)
+```
+
+### mencari seberapa banyak interaksi (engagement)
+```{r}
+ndf_post <- df_post %>% 
+  mutate(Engagement = `Likes and Comment`) %>% 
+  relocate(Engagement, .after = Comment) %>% 
+  select(-c(`Likes and Comment`, Platform))
+```
+
+### pemilihan kolom Date dan brand pada data follower
+```{r}
+df_follower <- follower %>% 
+  select(Date, `Skintific Indonesia`, SOMETHINC)
+```
+
+### pemindahan kolom full date setelah kolom date
+```{r}
+ndf_post <- ndf_post %>% 
+  relocate(my_date, .after = Date) %>% 
+  mutate(Date = date(Date))
+```
+
+
+### melakukan join data follower berdasarkan brand skintific dan somethinc
+```{r}
+follower_skintific_indonesia <- df_follower %>% 
+  select(Date, `Skintific Indonesia`) %>% 
+  select(Date, Follower = `Skintific Indonesia`) %>% 
+  mutate(Name = "Skintific Indonesia")
+
+follower_somethinc <- df_follower %>% 
+  select(Date, SOMETHINC) %>% 
+  select(Date, Follower = SOMETHINC) %>% 
+  mutate(Name = "SOMETHINC")
+
+final_follower <- rbind(follower_skintific_indonesia, follower_somethinc)
+```
+
+
+```{r}
+final_follower
+```
+
+
+#####
+
+##Load Data
+```{r}
+###install.packages("googlesheets4")
+
+
+library(googlesheets4)
+```
+
+##menyambungkan API R ke Gstudio
+```{r}
+gs4_auth(path = "salt-gemni-key.json")
+
+getwd()
+```
+
+##melakukan koneksi data ke spreadsheet
+```{r}
+gsheet <- gs4_get("https://docs.google.com/spreadsheets/d/1n-TZ4RAvIMbxeUOja7a3oFdJgCo3o6CfUKv-rgChHp4/edit#gid=1046688903")
+```
+
+#Kelompok 3
+
+#feature engineer
+##membuat kolom untuk memisahkan format jam dengan tanggal
+```{r}
+ndf_post <- ndf_post %>% 
+  mutate(Jam = hour(my_date)) %>% 
+  relocate(Jam, .after = Date)
+```
+
+##melakukan filter untuk menampilkan data hanya di tahun 2022
+```{r}
+ndf_post <- ndf_post %>% 
+filter(Date >= as.Date("2022-01-01"),
+       Date <= as.Date("2022-12-31"))
+```
+
+```{r}
+ndf_post
+```
+
+
+#membuat kolom baru 'image' untuk menambahkan text 
+```{r}
+ndf_post <- ndf_post %>% 
+  mutate(Image = paste0(Link,"media?size=l"))
+```
+
+#mengecek missing value seluruh data
+```{r}
+sum(is.na(ndf_post))
+```
+
+##mencari duplicate data berdasarkan caption
+
+```{r}
+sum(duplicated(ndf_post$Caption))
+```
+
+```{r}
+ndf_post %>% 
+  arrange(Engagement)
+```
+## menghapus postingan yang sudah tidak ada
+```{r}
+ndf_post <- ndf_post %>% 
+  arrange(Engagement) %>% 
+  filter(Link != "https://www.instagram.com/p/CdaeNZ3BinD/") %>% 
+  filter(Link != "https://www.instagram.com/p/CY-k3Vjv09c/") %>% 
+  filter(Link != "https://www.instagram.com/p/CcW9-j8vkOJ/") %>% 
+  filter(Link != "https://www.instagram.com/tv/Ca3-aCIFaBf/") %>% 
+  filter(Link != "https://www.instagram.com/p/CfAnFo0hDY-/") %>% 
+  filter(Link != "https://www.instagram.com/tv/CarfJ2ohdtY/") %>% 
+  filter(Link != "https://www.instagram.com/p/CfNm253vysY/") %>% 
+  filter(Link != "https://www.instagram.com/p/Cb69vSELUun/") %>% 
+  filter(Link != "https://www.instagram.com/p/CY-l6-8Pcq9/") %>% 
+  filter(Link != "https://www.instagram.com/tv/Ce8bc6OAGBO/") %>% 
+  filter(Link != "https://www.instagram.com/tv/CbPOpwsF2_g/") %>% 
+  filter(Link != "https://www.instagram.com/tv/CZjYvyOh5eu/") %>% 
+  filter(Link != "https://www.instagram.com/p/Ce29FdNh6d5/") %>% 
+  filter(Link != "https://www.instagram.com/p/Ce29FdNh6d5/") %>% 
+  filter(Link != "https://www.instagram.com/p/Ca3tQ15lVRT/") %>% 
+  filter(Link != "https://www.instagram.com/p/CcM3U3QLPhN/") %>% 
+  filter(Link != "https://www.instagram.com/tv/CaGme1TF14u/") %>% 
+  filter(Link != "https://www.instagram.com/p/CeuXxl2Lzj_/") %>% 
+  filter(Link != "https://www.instagram.com/p/Ca3pYQnFI7z/") %>% 
+  filter(Link != "https://www.instagram.com/p/CcmNkQXPQbY/") 
+```
+
+```{r}
+ndf_post
+```
+
+
+###menjawab pertanyaan 
+## nomor 1
+
+```{r}
+ndf_post %>% 
+  group_by(Name) %>% 
+  summarize(mean(Engagement))
+```
+  
+```{r}
+ndf_post %>% 
+  group_by(Date, Jam) %>% 
+  arrange(desc(Engagement))
+```
+```{r}
+ndf_post %>% 
+  group_by(Jam) %>% 
+  summarize(Rata2= mean(Engagement)) %>% 
+  arrange(desc(Rata2))
+```
+
+```{r}
+ndf_post %>% 
+  group_by(Name) %>% 
+  count()
+  
+```
+
+```{r}
+final_follower <- final_follower %>% 
+  filter(Date >= as.Date("2022-01-01"),
+       Date <= as.Date("2022-12-31"))
+```
+
+##check misisng value
+```{r}
+sum(is.na(final_follower))
+```
+
+```{r}
+final_follower$Follower == 0
+
+final_follower[final_follower$Follower == 0, ]
+
+final_follower[final_follower$Follower == 0, ]$Follower
+
+final_follower[final_follower$Follower == 0, ]$Follower <- 50422
+```
+
+
+```{r}
+final_follower <- final_follower %>% 
+  arrange(Name) %>% 
+  mutate(diff_follower = Follower - lag(Follower))
+```
+
+```{r}
+ndf_post_follower <- rbind(ndf_post, final_follower)
+```
+
+```{r}
+range_write(gsheet,
+            ndf_post_follower,
+            sheet = "Gemni")
+```
+
+
+
+```{r}
+final_follower %>% 
+  group_by(Name) %>% 
+  summarize(mean(Follower))
+```
